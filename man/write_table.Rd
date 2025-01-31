@@ -64,18 +64,19 @@ throws an error with informative messages.
 }
 \description{
 Provides unified syntax to write data from \code{\link[dplyr:tbl]{dplyr::tbl()}} (lazy
-dplyr query via a DBI connection) or a \code{\link[dplyr:sql]{dplyr::sql()}} or a \link{data.frame} to a
-database table with modes such as: \code{create}, \code{append}, \code{insert}, \code{update},
-\code{upsert}, \code{patch}, \code{delete}, \code{overwrite}, \code{overwrite_schema}.
+dplyr query via a DBI connection) or a \code{\link[dplyr:sql]{dplyr::sql()}} or a \link{data.frame} to
+a database table with modes such as: \code{create}, \code{append}, \code{insert},
+\code{update}, \code{upsert}, \code{patch}, \code{delete}, \code{overwrite}, \code{overwrite_schema}.
 }
 \details{
-The \link{DBI}-\link{dplyr}-\link{dbplyr} provide a great workflow to handle
-database operations from R. When saving the output from analysis notebooks
-or scripts, different functions need to be called based on the type of the
-object we intend to write. \code{writer} package solves the problem by exporting
-one generic \code{write_table} to handle multiple input types and multiple
-modes. Further, \code{overwrite} and \code{overwrite_schema} refine the idea of table
-overwrite so that schema of the table is not changed inadvertently.
+The \code{DBI-dplyr-dbplyr} combination provides a great workflow to
+handle database operations from R. When saving the output from analysis
+notebooks or scripts, different functions need to be called based on the
+type of the object we intend to write. \code{writer} package solves the problem
+by exporting one generic \code{write_table} to handle multiple input types and
+multiple modes. Further, \code{overwrite} and \code{overwrite_schema} refine the idea
+of table overwrite so that schema of the table is not changed
+inadvertently.
 \subsection{Modes}{
 \itemize{
 \item \code{create}: Creates a new table only if table with same name does not exist and writes data.

@@ -3,9 +3,9 @@
 #' @name write_table
 #' @title Write from multiple sources to a database table
 #' @description Provides unified syntax to write data from [dplyr::tbl()] (lazy
-#'   dplyr query via a DBI connection) or a [dplyr::sql()] or a [data.frame] to a
-#'   database table with modes such as: `create`, `append`, `insert`, `update`,
-#'   `upsert`, `patch`, `delete`, `overwrite`, `overwrite_schema`.
+#'   dplyr query via a DBI connection) or a [dplyr::sql()] or a [data.frame] to
+#'   a database table with modes such as: `create`, `append`, `insert`,
+#'   `update`, `upsert`, `patch`, `delete`, `overwrite`, `overwrite_schema`.
 #'
 #' @param x ( [dplyr::tbl()] or [dplyr::sql()] or [data.frame] ) The data to
 #'   write to the database. Input need not have any rows.
@@ -27,13 +27,14 @@
 #' @returns When successful, returns the output table name as a string. Else,
 #'   throws an error with informative messages.
 #'
-#' @details The [DBI]-[dplyr]-[dbplyr] provide a great workflow to handle
-#'   database operations from R. When saving the output from analysis notebooks
-#'   or scripts, different functions need to be called based on the type of the
-#'   object we intend to write. `writer` package solves the problem by exporting
-#'   one generic `write_table` to handle multiple input types and multiple
-#'   modes. Further, `overwrite` and `overwrite_schema` refine the idea of table
-#'   overwrite so that schema of the table is not changed inadvertently.
+#' @details The `DBI-dplyr-dbplyr` combination provides a great workflow to
+#'   handle database operations from R. When saving the output from analysis
+#'   notebooks or scripts, different functions need to be called based on the
+#'   type of the object we intend to write. `writer` package solves the problem
+#'   by exporting one generic `write_table` to handle multiple input types and
+#'   multiple modes. Further, `overwrite` and `overwrite_schema` refine the idea
+#'   of table overwrite so that schema of the table is not changed
+#'   inadvertently.
 #'
 #'   ## Modes
 #'
