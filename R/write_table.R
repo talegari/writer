@@ -22,6 +22,7 @@
 #'   When con is `NULL` and source is a `tbl_lazy`, then DBI connection object
 #'   from the source tbl is used. When source is a `data.frame`, then `con`
 #'   should be provided.
+#' @param verbose ( default: TRUE ) Whether the progress message should be shown
 #' @param ... Arguments passed to specific function based on `mode`. See
 #'   details.
 #' @returns When successful, returns the output table name as a string. Else,
@@ -295,7 +296,7 @@
 #' DBI::dbDisconnect(con)
 #' }
 #' @export
-write_table = function(x, table_name, mode, con = NULL, ...){
+write_table = function(x, table_name, mode, con = NULL, verbose = TRUE,...){
   UseMethod("write_table", x)
 }
 
@@ -315,6 +316,7 @@ write_table.tbl_lazy = function(x,
                                          "overwrite_schema"
                                          ),
                                 con = NULL,
+                                verbose = TRUE,
                                 ...
                                 ){
 
@@ -349,7 +351,9 @@ write_table.tbl_lazy = function(x,
   }
 
   # start progress bar *********************************************************
-  cli::cli_progress_step("Operation '{mode}': {table_name}", )
+  if (verbose){
+    cli::cli_progress_step("Operation '{mode}': {table_name}", )
+  }
 
   # Operation ******************************************************************
   ops = switch(mode,
@@ -393,6 +397,7 @@ write_table.sql = function(x,
                                     "overwrite_schema"
                                     ),
                            con = NULL,
+                           verbose = TRUE,
                            ...
                            ){
 
@@ -444,6 +449,7 @@ write_table.data.frame = function(x,
                                            "overwrite_schema"
                                            ),
                                   con = NULL,
+                                  verbose = TRUE,
                                   ...
                                   ){
 
@@ -483,7 +489,9 @@ write_table.data.frame = function(x,
   }
 
   # start progress bar *********************************************************
-  cli::cli_progress_step("Operation '{mode}': {table_name}")
+  if (verbose){
+    cli::cli_progress_step("Operation '{mode}': {table_name}", )
+  }
 
   # Operation ******************************************************************
   ops = switch(mode,
