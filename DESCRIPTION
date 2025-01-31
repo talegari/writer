@@ -1,0 +1,20 @@
+Type: Package
+Package: writer
+Title: Write from Multiple Sources to a Database Table
+Version: 0.1.0
+Authors@R: 
+    person("Komala Sheshachala", "Srikanth", , "sri.teach@gmail.com", role = c("aut", "cre"))
+Description: Provides unified syntax to write data from lazy dplyr tbl or
+    dplyr sql query or a dataframe to a database table with modes such as
+    create, append, insert, update, upsert, patch, delete, overwrite,
+    overwrite_schema.
+License: LGPL (>= 3)
+Imports: DBI, dplyr, dbplyr, glue, cli, rlang
+Suggests: 
+    RSQLite,
+    testthat (>= 3.0.0),
+Config/testthat/edition: 3
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
