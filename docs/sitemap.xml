@@ -1,0 +1,21 @@
+<urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
+<url><loc>/404.html</loc></url>
+<url><loc>/LICENSE.html</loc></url>
+<url><loc>/authors.html</loc></url>
+<url><loc>/index.html</loc></url>
+<url><loc>/news/index.html</loc></url>
+<url><loc>/reference/index.html</loc></url>
+<url><loc>/reference/string_to_id.html</loc></url>
+<url><loc>/reference/validate_table_name.html</loc></url>
+<url><loc>/reference/wrap_by_I.html</loc></url>
+<url><loc>/reference/write_df_append.html</loc></url>
+<url><loc>/reference/write_df_create.html</loc></url>
+<url><loc>/reference/write_df_overwrite.html</loc></url>
+<url><loc>/reference/write_df_overwrite_schema.html</loc></url>
+<url><loc>/reference/write_rows.html</loc></url>
+<url><loc>/reference/write_table.html</loc></url>
+<url><loc>/reference/write_tbl_create.html</loc></url>
+<url><loc>/reference/write_tbl_overwrite.html</loc></url>
+<url><loc>/reference/write_tbl_overwrite_schema.html</loc></url>
+</urlset>
+
