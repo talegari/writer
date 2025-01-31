@@ -9,10 +9,17 @@ Description: Provides unified syntax to write data from lazy dplyr tbl or
     create, append, insert, update, upsert, patch, delete, overwrite,
     overwrite_schema.
 License: LGPL (>= 3)
-Imports: DBI, dplyr, dbplyr, glue, cli, rlang
+Imports: 
+    DBI (>= 1.2.3),
+    dplyr (>= 1.1.0),
+    dbplyr (>= 2.3.1),
+    glue (>= 1.5.1),
+    cli (>= 3.4.0),
+    rlang (>= 1.1.2)
 Suggests: 
     RSQLite,
     testthat (>= 3.0.0),
+URL: https://github.com/talegari/writer
 Config/testthat/edition: 3
 Encoding: UTF-8
 LazyData: true
