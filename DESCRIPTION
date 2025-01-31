@@ -3,9 +3,14 @@ Package: writer
 Title: Write from Multiple Sources to a Database Table
 Version: 0.1.0
 Authors@R: 
-    person("Komala Sheshachala", "Srikanth", , "sri.teach@gmail.com", role = c("aut", "cre"))
-Description: Provides unified syntax to write data from lazy dplyr tbl or
-    dplyr sql query or a dataframe to a database table with modes such as
+    person(
+    "Komala Sheshachala", "Srikanth",
+    email = "sri.teach@gmail.com",
+    role = c("aut", "cre"),
+    comment = c(ORCID = "0000-0002-1865-5668")
+    )
+Description: Provides unified syntax to write data from lazy 'dplyr' 'tbl' or
+    'dplyr' 'sql' query or a dataframe to a database table with modes such as
     create, append, insert, update, upsert, patch, delete, overwrite,
     overwrite_schema.
 License: LGPL (>= 3)

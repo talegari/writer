@@ -349,7 +349,7 @@ write_table.tbl_lazy = function(x,
   }
 
   # start progress bar *********************************************************
-  cli::cli_progress_step("Operation '{mode}': {table_name}")
+  cli::cli_progress_step("Operation '{mode}': {table_name}", )
 
   # Operation ******************************************************************
   ops = switch(mode,
@@ -399,7 +399,7 @@ write_table.sql = function(x,
   # assertions and setup *******************************************************
   if (!inherits(con, "DBIConnection")){
     cli::cli_inform("'con' is typically generated from `DBI::dbConnect`")
-    cli::cli_abort("'con' shoule be a `DBIConnection` object",
+    cli::cli_abort("'con' should be a `DBIConnection` object",
                    class = "error_input"
                    )
   }
@@ -453,7 +453,7 @@ write_table.data.frame = function(x,
 
   if (!inherits(con, "DBIConnection")){
     cli::cli_inform("'con' is typically generated from `DBI::dbConnect`")
-    cli::cli_abort("'con' shoule be a `DBIConnection` object",
+    cli::cli_abort("'con' should be a `DBIConnection` object",
                    class = "error_input"
                    )
   }
