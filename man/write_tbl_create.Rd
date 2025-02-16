@@ -4,7 +4,7 @@
 \alias{write_tbl_create}
 \title{write_tbl_create}
 \usage{
-write_tbl_create(source_tbl, dest_table_name, con, ...)
+write_tbl_create(source_tbl, dest_table_name, con, transaction_flag, ...)
 }
 \description{
 write_tbl_create

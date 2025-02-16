@@ -7,7 +7,15 @@
 \alias{write_table.data.frame}
 \title{Write from multiple sources to a database table}
 \usage{
-write_table(x, table_name, mode, con = NULL, verbose = TRUE, ...)
+write_table(
+  x,
+  table_name,
+  mode,
+  con = NULL,
+  use_transaction = TRUE,
+  verbose = TRUE,
+  ...
+)
 
 \method{write_table}{tbl_lazy}(
   x,
@@ -15,6 +23,7 @@ write_table(x, table_name, mode, con = NULL, verbose = TRUE, ...)
   mode = c("create", "append", "insert", "update", "upsert", "patch", "delete",
     "overwrite", "overwrite_schema"),
   con = NULL,
+  use_transaction = TRUE,
   verbose = TRUE,
   ...
 )
@@ -25,6 +34,7 @@ write_table(x, table_name, mode, con = NULL, verbose = TRUE, ...)
   mode = c("create", "append", "insert", "update", "upsert", "patch", "delete",
     "overwrite", "overwrite_schema"),
   con = NULL,
+  use_transaction = TRUE,
   verbose = TRUE,
   ...
 )
@@ -35,6 +45,7 @@ write_table(x, table_name, mode, con = NULL, verbose = TRUE, ...)
   mode = c("create", "append", "insert", "update", "upsert", "patch", "delete",
     "overwrite", "overwrite_schema"),
   con = NULL,
+  use_transaction = TRUE,
   verbose = TRUE,
   ...
 )
@@ -58,7 +69,11 @@ When con is \code{NULL} and source is a \code{tbl_lazy}, then DBI connection obj
 from the source tbl is used. When source is a \code{data.frame}, then \code{con}
 should be provided.}
 
-\item{verbose}{( default: TRUE ) Whether the progress message should be shown}
+\item{use_transaction}{( flag, default: \code{TRUE} ) Whether the operation should
+be run within a transaction.}
+
+\item{verbose}{( default: \code{TRUE} ) Whether the progress message should be
+shown}
 
 \item{...}{Arguments passed to specific function based on \code{mode}. See
 details.}
@@ -120,6 +135,19 @@ Errors are raised with a
  * `overwrite`: modify existing table
  * `overwrite_schema`: delete, create and rename table
 }\if{html}{\out{</div>}}
+}
+
+\subsection{Using transaction}{
+
+The \code{use_transaction} is always switched on. User should opt-out to achieve
+an operation if the specific database connection does not permit
+transactions.
+}
+
+\subsection{Copying data with dataframe input}{
+
+When input is a dataframe, \code{dplyr::copy_to()} is used.
+Supply \code{use_inline = TRUE} to use \code{dbplyr::copy_inline()} instead.
 }
 }
 \examples{

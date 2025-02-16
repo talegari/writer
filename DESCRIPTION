@@ -1,7 +1,7 @@
 Type: Package
 Package: writer
 Title: Write from Multiple Sources to a Database Table
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: 
     person(
     "Komala Sheshachala", "Srikanth",
@@ -20,7 +20,7 @@ Imports:
     dbplyr (>= 2.3.1),
     glue (>= 1.5.1),
     cli (>= 3.4.0),
-    rlang (>= 1.1.2)
+    rlang (>= 1.1.5),
 Suggests: 
     RSQLite,
     testthat (>= 3.0.0),

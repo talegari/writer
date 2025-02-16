@@ -11,50 +11,56 @@
 # dest_table_name is a string in 'a.b.c' format
 # con is the connection to used to write to 'dest_table_name'
 # Typically this is same as connection object held by 'source_tbl'
-# cross connection writes are possible
-#
-# modes covered by write_tbl_*: overwrite, overwrite_schema, create
-#
-# write_df_*
-# writes from data.frame to dest_table_name
-# modes covered by write_df_*: overwrite, overwrite_schema, create
-#
-# write_rows writes from a 'source' to 'dest_table_name'
-# 'source' can be either a dataframe or a tbl
-# modes covered by write_rows: append, insert, update, upsert, patch, delete
 #
 # All workers either return TRUE (when job is done successfully)
 # or return the 'try-error' object
+#
+# circle of hell:
+#
+# 1. rows_* call uses transaction when inplace, but does the ops correctly.
+# Some databases dont allow transaction. So this is limiting.
+# 2. rows_* call without inplace returns a overall query which can only be used
+# in overwrite sense which is impractical for large tables.
+# 3. Correct sql can be generated from sql_query_* functions which is tricky
+# due to unclear documentation. `patch` needs separate write here. Pretty much
+# this is the only route for seperate implementations for with or without
+# transaction.
+
 
 #' @keywords internal
 #' @title write_tbl_overwrite
 #' @description write_tbl_overwrite
-write_tbl_overwrite = function(source_tbl, dest_table_name, con, ...){
+write_tbl_overwrite = function(source_tbl,
+                               dest_table_name,
+                               con,
+                               transaction_flag,
+                               ...
+                               ){
 
   # 1. begin transaction
   # 2. truncate dest table
   # 3. append rows from source tbl
   # 4. Commit/Rollback based on error
 
-  DBI::dbBegin(con)
+  if (transaction_flag) DBI::dbBegin(con)
   ops_delete = try({
     DBI::dbExecute(con, glue::glue("DELETE FROM {dest_table_name}"))
   }, silent = TRUE)
 
   if (inherits(ops_delete, "try-error")){
-    DBI::dbRollback(con)
+    if (transaction_flag) DBI::dbRollback(con)
     return(ops_delete)
   } else {
-    DBI::dbCommit(con)
+    if (transaction_flag) DBI::dbCommit(con)
   }
 
   ops_append = try({
-    dplyr::rows_append(x = dplyr::tbl(con, wrap_by_I(dest_table_name)),
-                       y = source_tbl,
-                       in_place = TRUE,
-                       copy = TRUE,
-                       ...
-                       )
+    write_tbl_append(source_tbl,
+                     dest_table_name,
+                     con,
+                     transaction_flag,
+                     ...
+                     )
   }, silent = TRUE)
 
   if (inherits(ops_append, "try-error")){
@@ -67,7 +73,12 @@ write_tbl_overwrite = function(source_tbl, dest_table_name, con, ...){
 #' @keywords internal
 #' @title write_tbl_overwrite_schema
 #' @description write_tbl_overwrite_schema
-write_tbl_overwrite_schema = function(source_tbl, dest_table_name, con, ...){
+write_tbl_overwrite_schema = function(source_tbl,
+                                      dest_table_name,
+                                      con,
+                                      transaction_flag,
+                                      ...
+                                      ){
 
   # 1. Write source_tbl to some new table
   # 2. delete the dest table, if it exists.
@@ -94,15 +105,15 @@ write_tbl_overwrite_schema = function(source_tbl, dest_table_name, con, ...){
 
   temp_table_name = paste0(temp_table_split, collapse = ".")
 
-  DBI::dbBegin(con)
+  if (transaction_flag) DBI::dbBegin(con)
   ops = try({
-    create_query =
+    stmt =
       dbplyr::sql_query_save(con = con,
                              sql = dbplyr::sql_render(source_tbl),
                              name = wrap_by_I(temp_table_name),
                              temporary = FALSE
                              )
-    DBI::dbExecute(con, create_query)
+    DBI::dbExecute(con, stmt)
     DBI::dbRemoveTable(con, string_to_id(dest_table_name))
     DBI::dbExecute(
       con,
@@ -112,10 +123,10 @@ write_tbl_overwrite_schema = function(source_tbl, dest_table_name, con, ...){
   )
 
     if (inherits(ops, "try-error")){
-      DBI::dbRollback(con)
+      if (transaction_flag) DBI::dbRollback(con)
       return(ops)
     } else {
-      DBI::dbCommit(con)
+      if (transaction_flag) DBI::dbCommit(con)
       return(TRUE)
     }
 }
@@ -123,69 +134,74 @@ write_tbl_overwrite_schema = function(source_tbl, dest_table_name, con, ...){
 #' @keywords internal
 #' @title write_tbl_create
 #' @description write_tbl_create
-write_tbl_create = function(source_tbl, dest_table_name, con, ...){
+write_tbl_create = function(source_tbl,
+                            dest_table_name,
+                            con,
+                            transaction_flag,
+                            ...
+                            ){
 
   # 1. begin transaction
   # 2. create table
   # 4. Commit/Rollback based on error
 
-  DBI::dbBegin(con)
+  if (transaction_flag) DBI::dbBegin(con)
   ops = try({
-    create_query =
+    stmt =
       dbplyr::sql_query_save(con = con,
                              sql = dbplyr::sql_render(source_tbl),
                              name = wrap_by_I(dest_table_name),
                              temporary = FALSE
                              )
-    DBI::dbExecute(con, create_query)
+    DBI::dbExecute(con, stmt)
   }, silent = TRUE)
 
   if (inherits(ops, "try-error")){
-    DBI::dbRollback(con)
+    if (transaction_flag) DBI::dbRollback(con)
     return(ops)
   } else {
-    DBI::dbCommit(con)
+    if (transaction_flag) DBI::dbCommit(con)
     return(TRUE)
   }
 }
 
 #' @keywords internal
-#' @title write_df_overwrite
-#' @description write_df_overwrite
-write_df_overwrite = function(df, dest_table_name, con, ...){
+#' @title write_tbl_append
+#' @description write_tbl_append
+write_tbl_append = function(source_tbl,
+                            dest_table_name,
+                            con,
+                            transaction_flag,
+                            ...
+                            ){
 
   # 1. begin transaction
-  # 2. truncate dest table
-  # 3. append rows from source tbl
+  # 2. append table
   # 4. Commit/Rollback based on error
 
-  ops = try({
-    DBI::dbBegin(con)
-    DBI::dbExecute(con, glue::glue("DELETE FROM {dest_table_name}"))
-    DBI::dbWriteTable(con, string_to_id(dest_table_name), df, append = TRUE)
-  }, silent = TRUE)
-
-  if (inherits(ops, "try-error")){
-    DBI::dbRollback(con)
-    return(ops)
-  } else {
-    DBI::dbCommit(con)
-    return(TRUE)
-  }
-}
-
-#' @keywords internal
-#' @title write_df_overwrite_schema
-#' @description write_df_overwrite_schema
-write_df_overwrite_schema = function(df, dest_table_name, con, ...){
-
-  ops = try({
-    DBI::dbWriteTable(con,
-                      string_to_id(dest_table_name),
-                      df,
-                      overwrite = TRUE
-                      )
+  if (!transaction_flag){
+    ops = try({
+      stmt =
+        dbplyr::sql_query_append(con = con,
+                                 table = wrap_by_I(dest_table_name),
+                                 from = dbplyr::sql_render(source_tbl),
+                                 insert_cols = colnames(source_tbl),
+                                 ...
+                                 )
+      DBI::dbExecute(con, stmt)
     }, silent = TRUE)
+
+  } else {
+
+    ops = try({
+      dplyr::rows_append(x = dplyr::tbl(con, wrap_by_I(dest_table_name)),
+                         y = source_tbl,
+                         copy = TRUE,
+                         in_place = TRUE,
+                         ...
+                         )
+      }, silent = TRUE)
+  }
 
   if (inherits(ops, "try-error")){
     return(ops)
@@ -195,18 +211,44 @@ write_df_overwrite_schema = function(df, dest_table_name, con, ...){
 }
 
 #' @keywords internal
-#' @title write_df_create
-#' @description write_df_create
-write_df_create = function(df, dest_table_name, con, ...){
+#' @title write_tbl_insert
+#' @description write_tbl_insert
+write_tbl_insert = function(source_tbl,
+                            dest_table_name,
+                            con,
+                            transaction_flag,
+                            ...
+                            ){
 
-  ops = try({
-    DBI::dbWriteTable(con,
-                      string_to_id(dest_table_name),
-                      df
-                      )
+  # 1. begin transaction
+  # 2. insert table
+  # 4. Commit/Rollback based on error
+
+  if (!transaction_flag){
+    ops = try({
+      stmt =
+        dbplyr::sql_query_insert(con = con,
+                                 table = wrap_by_I(dest_table_name),
+                                 from = dbplyr::sql_render(source_tbl),
+                                 insert_cols = colnames(source_tbl),
+                                 ...
+                                 )
+      DBI::dbExecute(con, stmt)
     }, silent = TRUE)
 
-  if (!inherits(ops, "try-error")){
+  } else {
+
+    ops = try({
+      dplyr::rows_insert(x = dplyr::tbl(con, wrap_by_I(dest_table_name)),
+                         y = source_tbl,
+                         copy = TRUE,
+                         in_place = TRUE,
+                         ...
+                         )
+      }, silent = TRUE)
+  }
+
+  if (inherits(ops, "try-error")){
     return(ops)
   } else {
     return(TRUE)
@@ -214,20 +256,68 @@ write_df_create = function(df, dest_table_name, con, ...){
 }
 
 #' @keywords internal
-#' @title write_df_create
-#' @description write_df_create
-write_df_append = function(df, dest_table_name, con, ...){
+#' @title write_tbl_update
+#' @description write_tbl_update
+write_tbl_update = function(source_tbl,
+                            dest_table_name,
+                            con,
+                            transaction_flag,
+                            ...
+                            ){
 
-  ops = try({
-    DBI::dbWriteTable(con,
-                      string_to_id(dest_table_name),
-                      df,
-                      append = TRUE,
-                      ...
-                      )
+  # 1. begin transaction
+  # 2. update table
+  # 4. Commit/Rollback based on error
+
+  args = list(...)
+  if (!("by" %in% names(args))){
+    cli::cli_abort("Arg {.field by} should be provided.")
+  }
+
+  if (!transaction_flag){
+    # validate by
+    dest_names = colnames(dplyr::tbl(con, I(dest_table_name)))
+    if (!(is.character(args$by) & all(args$by %in% dest_names))){
+      cli::cli_abort("Arg {.field by} should be subset of column names.")
+    }
+
+    # this chunk was taken from `dbplyr::row_update.tbl_lazy` from `dbplyr`
+    update_cols = setdiff(colnames(source_tbl), args$by)
+    update_values = rlang::set_names(
+      sql_table_prefix(con, update_cols, "...y"),
+      update_cols
+      )
+
+    ops = try({
+      stmt =
+        do.call(dbplyr::sql_query_update_from,
+                c(list(con = con,
+                       table = wrap_by_I(dest_table_name),
+                       from = dbplyr::sql_render(source_tbl),
+                       update_values = update_values
+                       ),
+                  args # arg 'by' is here
+                  )
+              )
+      DBI::dbExecute(con, stmt)
     }, silent = TRUE)
 
-  if (!inherits(ops, "try-error")){
+  } else {
+
+    ops = try({
+      do.call(dplyr::rows_update,
+              c(list(x = dplyr::tbl(con, wrap_by_I(dest_table_name)),
+                     y = source_tbl,
+                     copy = TRUE,
+                     in_place = TRUE
+                     ),
+                args # arg 'by' is here
+                )
+              )
+      }, silent = TRUE)
+  }
+
+  if (inherits(ops, "try-error")){
     return(ops)
   } else {
     return(TRUE)
@@ -235,40 +325,171 @@ write_df_append = function(df, dest_table_name, con, ...){
 }
 
 #' @keywords internal
-#' @title write_rows
-#' @description write_rows
-write_rows = function(source,
-                      dest_table_name,
-                      con,
-                      mode = c("append",
-                               "insert",
-                               "update",
-                               "upsert",
-                               "patch",
-                               "delete"
-                               ),
-                      ...
-                      ){
-  # source is either a tbl or dataframe
-  fun = switch(mode,
-    append = dplyr::rows_append,
-    insert = dplyr::rows_insert,
-    update = dplyr::rows_update,
-    upsert = dplyr::rows_upsert,
-    delete = dplyr::rows_delete,
-    patch  = dplyr::rows_patch
-  )
+#' @title write_tbl_upsert
+#' @description write_tbl_upsert
+write_tbl_upsert = function(source_tbl,
+                            dest_table_name,
+                            con,
+                            transaction_flag,
+                            ...
+                            ){
 
-  dest_tbl = dplyr::tbl(con, wrap_by_I(dest_table_name))
+  # 1. begin transaction
+  # 2. upsert table
+  # 4. Commit/Rollback based on error
 
-  ops = try({
-    fun(x = dest_tbl,
-        y = source,
-        copy = TRUE,
-        in_place = TRUE,
-        ...
-        )
-  }, silent = TRUE)
+  arguments = list(...)
+  if (!("by" %in% names(arguments))){
+    cli::cli_abort("Arg {.field by} should be provided.")
+  }
+
+  if (!transaction_flag){
+    # validate by
+    dest_names = colnames(dplyr::tbl(con, I(dest_table_name)))
+    if (!(is.character(arguments$by) && all(arguments$by %in% dest_names))){
+      cli::cli_abort("Arg {.field by} should be subset of column names.")
+    }
+
+    if (!("update_cols" %in% names(arguments))) {
+      arguments$update_cols = setdiff(colnames(source_tbl), arguments$by)
+    }
+
+    ops = try({
+      stmt =
+        do.call(dbplyr::sql_query_upsert,
+                c(list(con = con,
+                       table = dest_table_name, # should not wrap
+                       from = dbplyr::sql_render(source_tbl)
+                       ),
+                  arguments # arguments 'by' and 'update_cols' are here
+                  )
+                )
+      DBI::dbExecute(con, stmt)
+    }, silent = TRUE)
+
+  } else {
+
+    ops = try({
+      do.call(dplyr::rows_upsert,
+              c(list(x = dplyr::tbl(con, wrap_by_I(dest_table_name)),
+                     y = source_tbl,
+                     copy = TRUE,
+                     in_place = TRUE
+                     ),
+                arguments # arguments 'by' and 'update_cols' are here
+                )
+              )
+      }, silent = TRUE)
+  }
+
+  if (inherits(ops, "try-error")){
+    return(ops)
+  } else {
+    return(TRUE)
+  }
+}
+
+#' @keywords internal
+#' @title write_tbl_patch
+#' @description write_tbl_patch
+write_tbl_patch = function(source_tbl,
+                            dest_table_name,
+                            con,
+                            transaction_flag,
+                            ...
+                            ){
+
+  # 1. begin transaction
+  # 2. patch rows from table
+  # 4. Commit/Rollback based on error
+
+  args = list(...)
+  if (!("by" %in% names(args))){
+    cli::cli_abort("Arg {.field by} should be provided.")
+  }
+
+  if (!transaction_flag){
+
+    cli::cli_abort("Yet to implement transaction free patch",
+                   class = "error_not_implemented"
+                   )
+
+  } else {
+
+    ops = try({
+      do.call(dplyr::rows_patch,
+              c(list(x = dplyr::tbl(con, wrap_by_I(dest_table_name)),
+                     y = source_tbl,
+                     copy = TRUE,
+                     in_place = TRUE
+                     ),
+                args # arg 'by'
+                )
+              )
+      }, silent = TRUE)
+  }
+
+  if (inherits(ops, "try-error")){
+    return(ops)
+  } else {
+    return(TRUE)
+  }
+}
+
+#' @keywords internal
+#' @title write_tbl_delete
+#' @description write_tbl_delete
+write_tbl_delete = function(source_tbl,
+                            dest_table_name,
+                            con,
+                            transaction_flag,
+                            ...
+                            ){
+
+  # 1. begin transaction
+  # 2. delete rows from table
+  # 4. Commit/Rollback based on error
+
+  args = list(...)
+  if (!("by" %in% names(args))){
+    cli::cli_abort("Arg {.field by} should be provided.")
+  }
+
+  if (!transaction_flag){
+
+    # validate by
+    dest_names = colnames(dplyr::tbl(con, I(dest_table_name)))
+    if (!(is.character(args$by) & all(args$by %in% dest_names))){
+      cli::cli_abort("Arg {.field by} should be subset of column names.")
+    }
+
+    ops = try({
+      stmt =
+        do.call(dbplyr::sql_query_delete,
+                c(list(con = con,
+                       table = wrap_by_I(dest_table_name),
+                       from = dbplyr::sql_render(source_tbl)
+                       ),
+                  args # arg 'by'
+                  )
+                )
+      DBI::dbExecute(con, stmt)
+    }, silent = TRUE)
+
+  } else {
+
+    ops = try({
+      do.call(dplyr::rows_delete,
+              c(list(x = dplyr::tbl(con, wrap_by_I(dest_table_name)),
+                     y = source_tbl,
+                     copy = TRUE,
+                     in_place = TRUE
+                     ),
+                args # arg 'by'
+                )
+              )
+      }, silent = TRUE)
+  }
 
   if (inherits(ops, "try-error")){
     return(ops)
