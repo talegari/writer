@@ -14,8 +14,15 @@
 <url><loc>/reference/write_df_overwrite_schema.html</loc></url>
 <url><loc>/reference/write_rows.html</loc></url>
 <url><loc>/reference/write_table.html</loc></url>
+<url><loc>/reference/write_tbl_append.html</loc></url>
 <url><loc>/reference/write_tbl_create.html</loc></url>
+<url><loc>/reference/write_tbl_delete.html</loc></url>
+<url><loc>/reference/write_tbl_insert.html</loc></url>
 <url><loc>/reference/write_tbl_overwrite.html</loc></url>
 <url><loc>/reference/write_tbl_overwrite_schema.html</loc></url>
+<url><loc>/reference/write_tbl_patch.html</loc></url>
+<url><loc>/reference/write_tbl_update.html</loc></url>
+<url><loc>/reference/write_tbl_upsert.html</loc></url>
+<url><loc>/reference/writer-package.html</loc></url>
 </urlset>
 

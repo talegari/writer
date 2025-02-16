@@ -22,7 +22,10 @@
 #'   When con is `NULL` and source is a `tbl_lazy`, then DBI connection object
 #'   from the source tbl is used. When source is a `data.frame`, then `con`
 #'   should be provided.
-#' @param verbose ( default: TRUE ) Whether the progress message should be shown
+#' @param use_transaction ( flag, default: `TRUE` ) Whether the operation should
+#'   be run within a transaction.
+#' @param verbose ( default: `TRUE` ) Whether the progress message should be
+#'   shown
 #' @param ... Arguments passed to specific function based on `mode`. See
 #'   details.
 #' @returns When successful, returns the output table name as a string. Else,
@@ -70,6 +73,17 @@
 #'      * `append`, `insert`, `update`, `upsert`, `patch`, `delete`: modify existing table
 #'      * `overwrite`: modify existing table
 #'      * `overwrite_schema`: delete, create and rename table
+#'
+#'   ## Using transaction
+#'
+#'   The `use_transaction` is always switched on. User should opt-out to achieve
+#'   an operation if the specific database connection does not permit
+#'   transactions.
+#'
+#'   ## Copying data with dataframe input
+#'
+#'   When input is a dataframe, `dplyr::copy_to()` is used.
+#'   Supply `use_inline = TRUE` to use `dbplyr::copy_inline()` instead.
 #'
 #' @examples
 #' \dontrun{
@@ -296,7 +310,14 @@
 #' DBI::dbDisconnect(con)
 #' }
 #' @export
-write_table = function(x, table_name, mode, con = NULL, verbose = TRUE,...){
+write_table = function(x,
+                       table_name,
+                       mode,
+                       con = NULL,
+                       use_transaction = TRUE,
+                       verbose = TRUE,
+                       ...
+                       ){
   UseMethod("write_table", x)
 }
 
@@ -316,6 +337,7 @@ write_table.tbl_lazy = function(x,
                                          "overwrite_schema"
                                          ),
                                 con = NULL,
+                                use_transaction = TRUE,
                                 verbose = TRUE,
                                 ...
                                 ){
@@ -350,24 +372,41 @@ write_table.tbl_lazy = function(x,
     }
   }
 
+  if (!(use_transaction %in% c(TRUE, FALSE))){
+    cli::cli_abort("Arg {.field use_transaction} should be a flag")
+  }
+
+  if (!(verbose %in% c(TRUE, FALSE))){
+    cli::cli_abort("Arg {.field verbose} should be a flag")
+  }
+
   # start progress bar *********************************************************
   if (verbose){
     cli::cli_progress_step("Operation '{mode}': {table_name}", )
   }
 
   # Operation ******************************************************************
-  ops = switch(mode,
+  ops = {
 
-    create = write_tbl_create(x, table_name, con, ...),
-    overwrite = write_tbl_overwrite(x, table_name, con, ...),
-    overwrite_schema = write_tbl_overwrite_schema(x, table_name, con, ...),
-    append = write_rows(x, table_name, con, "append", ...),
-    insert = write_rows(x, table_name, con, "insert", ...),
-    update = write_rows(x, table_name, con, "update", ...),
-    upsert = write_rows(x, table_name, con, "upsert", ...),
-    patch  = write_rows(x, table_name, con, "patch", ...),
-    delete = write_rows(x, table_name, con, "delete", ...),
-    )
+    fun = switch(mode,
+                 create    = write_tbl_create,
+                 overwrite = write_tbl_overwrite,
+                 append    = write_tbl_append,
+                 insert    = write_tbl_insert,
+                 upsert    = write_tbl_upsert,
+                 update    = write_tbl_update,
+                 patch     = write_tbl_patch,
+                 delete    = write_tbl_delete,
+                 overwrite_schema = write_tbl_overwrite_schema,
+                 )
+
+    fun(source_tbl = x,
+        dest_table_name = table_name,
+        con = con,
+        transaction_flag = use_transaction,
+        ...
+        )
+  }
 
   # handle exceptions **********************************************************
   if (inherits(ops, "try-error")){
@@ -397,6 +436,7 @@ write_table.sql = function(x,
                                     "overwrite_schema"
                                     ),
                            con = NULL,
+                           use_transaction = TRUE,
                            verbose = TRUE,
                            ...
                            ){
@@ -423,12 +463,13 @@ write_table.sql = function(x,
                    )
   } else {
 
-    write_table.tbl_lazy(tbl_obj,
-                         table_name = table_name,
-                         mode = mode,
-                         con = NULL,
-                         ...
-                         )
+    write_table(tbl_obj,
+                table_name = table_name,
+                mode = mode,
+                con = con,
+                transaction_flag = use_transaction,
+                ...
+                )
 
   }
 }
@@ -449,11 +490,13 @@ write_table.data.frame = function(x,
                                            "overwrite_schema"
                                            ),
                                   con = NULL,
+                                  use_transaction = TRUE,
                                   verbose = TRUE,
                                   ...
                                   ){
 
   # assertions and setup *******************************************************
+  arguments = list(...)
   rlang::arg_match(mode)
   table_name = validate_table_name(table_name)
 
@@ -493,19 +536,63 @@ write_table.data.frame = function(x,
     cli::cli_progress_step("Operation '{mode}': {table_name}", )
   }
 
-  # Operation ******************************************************************
-  ops = switch(mode,
+  # create temporary table on the same schema and write df *********************
+  create_random_name = function(len = 20){
+    paste0(sample(letters, len), collapse = "")
+  }
 
-    create = write_df_create(x, table_name, con, ...),
-    overwrite = write_df_overwrite(x, table_name, con, ...),
-    overwrite_schema = write_df_overwrite_schema(x, table_name, con, ...),
-    append = write_df_append(x, table_name, con, ...),
-    insert = write_rows(x, table_name, con, "insert", ...),
-    update = write_rows(x, table_name, con, "update", ...),
-    upsert = write_rows(x, table_name, con, "upsert", ...),
-    patch  = write_rows(x, table_name, con, "patch", ...),
-    delete = write_rows(x, table_name, con, "delete", ...),
-    )
+  table_name_split = strsplit(table_name, "\\.")[[1]]
+  temp_table_split = table_name_split
+
+  while (TRUE){
+    temp_table_split[length(temp_table_split)] = create_random_name()
+
+    table_exists_flag =
+      DBI::dbExistsTable(con,
+                         string_to_id(paste0(temp_table_split, collapse = "."))
+                         )
+    if (!table_exists_flag){
+      break
+    }
+  }
+
+  temp_table_name = paste0(temp_table_split, collapse = ".")
+
+  if (("use_inline" %in% names(arguments)) && arguments$use_inline){
+    df_tbl = dbplyr::copy_inline(con = con, df = x)
+  } else {
+    df_tbl = dplyr::copy_to(dest = con,
+                            df = x,
+                            name = wrap_by_I(temp_table_name),
+                            temporary = TRUE
+                            )
+  }
+
+  # Operation ******************************************************************
+  ops = {
+
+    fun = switch(mode,
+                 create    = write_tbl_create,
+                 overwrite = write_tbl_overwrite,
+                 append    = write_tbl_append,
+                 insert    = write_tbl_insert,
+                 upsert    = write_tbl_upsert,
+                 update    = write_tbl_update,
+                 patch     = write_tbl_patch,
+                 delete    = write_tbl_delete,
+                 overwrite_schema = write_tbl_overwrite_schema
+                 )
+
+    do.call(fun,
+            c(list(source_tbl = df_tbl,
+                   dest_table_name = table_name,
+                   con = con,
+                   transaction_flag = use_transaction
+                   ),
+              arguments
+              )
+            )
+  }
 
   # handle exceptions **********************************************************
   if (inherits(ops, "try-error")){

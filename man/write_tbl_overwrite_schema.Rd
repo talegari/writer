@@ -4,7 +4,13 @@
 \alias{write_tbl_overwrite_schema}
 \title{write_tbl_overwrite_schema}
 \usage{
-write_tbl_overwrite_schema(source_tbl, dest_table_name, con, ...)
+write_tbl_overwrite_schema(
+  source_tbl,
+  dest_table_name,
+  con,
+  transaction_flag,
+  ...
+)
 }
 \description{
 write_tbl_overwrite_schema

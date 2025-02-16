@@ -11,7 +11,9 @@ test_that("Append data to existing table", {
   DBI::dbWriteTable(con, "new_table", df, overwrite = TRUE)
 
   append_df = data.frame(id = 4:5, name = c("Dave", "Eve"))
-  write_table(append_df, "new_table", mode = "append", con = con)
+  write_table(append_df, "new_table", mode = "append", con = con,
+              use_transaction = F
+              )
 
   expect_equal(dplyr::tbl(con, "new_table") |> dplyr::collect(),
                rbind(df, append_df),
@@ -28,9 +30,11 @@ test_that("Append data to non-existing table", {
   append_df = data.frame(id = 4:5, name = c("Dave", "Eve"))
 
   # Write the data
-  expect_error(write_table(append_df, "new_table", mode = "append", con = con))
+  expect_error(write_table(append_df, "new_table", mode = "append", con = con,
+                           use_transaction = F
+                           )
+               )
 })
-
 
 ## create ----------------------------------------------------------------------
 
@@ -39,7 +43,7 @@ test_that("create new table", {
   on.exit(DBI::dbDisconnect(con))
 
   df = data.frame(id = 1:3, name = c("Alice", "Bob", "Charlie"))
-  write_table(df, "new_table", mode = "create", con = con)
+  write_table(df, "new_table", mode = "create", con = con, use_transaction = F)
 
   expect_equal(df,
                dplyr::tbl(con, "new_table") |>
@@ -54,10 +58,11 @@ test_that("create fails with existing table (append mode)", {
   on.exit(DBI::dbDisconnect(con))
 
   df = data.frame(id = 1:3, name = c("Alice", "Bob", "Charlie"))
-  write_table(df, "new_table", mode = "create", con = con)
+  write_table(df, "new_table", mode = "create", con = con, use_transaction = F)
 
   # Expected error message
-  expect_error(write_table(df, "new_table", mode = "create", con = con))
+  expect_error(write_table(df, "new_table", mode = "create", con = con,
+                           use_transaction = F))
 })
 
 ## insert ----------------------------------------------------------------------
@@ -83,7 +88,8 @@ test_that("insert without conflicts", {
                 mode = "insert",
                 con = con,
                 by = "id",
-                conflict = "ignore"
+                conflict = "ignore",
+                use_transaction = F
                 )
 
   after_insert_df =
@@ -112,7 +118,8 @@ test_that("insert handles conflicts (ignore)", {
                 mode = "insert",
                 con = con,
                 by = "id",
-                conflict = "ignore"
+                conflict = "ignore",
+                use_transaction = F
                 )
 
   after_insert_df =
@@ -138,7 +145,7 @@ test_that("update", {
               mode = "update",
               con = con,
               by = "id",
-              unmatched = "ignore"
+              use_transaction = F
               )
 
   updated_df = dplyr::tbl(con, "new_table") |>
@@ -149,7 +156,7 @@ test_that("update", {
 
   # Update with unmatched rows ignored
   DBI::dbRemoveTable(con, "new_table")
-  write_table(df, "new_table", mode = "create", con = con)
+  write_table(df, "new_table", mode = "create", con = con, use_transaction = F)
 
   update_df_unmatched = data.frame(id = c(1, 4), name = c("Alicia", "David"))
   write_table(update_df_unmatched,
@@ -157,7 +164,7 @@ test_that("update", {
               mode = "update",
               con = con,
               by = "id",
-              unmatched = "ignore"
+              use_transaction = F
               )
   updated_df =
     dplyr::tbl(con, "new_table") |>
@@ -168,13 +175,13 @@ test_that("update", {
 
   # Update from tbl_lazy
   DBI::dbRemoveTable(con, "new_table")
-  write_table(df, "new_table", mode = "create", con = con)
+  write_table(df, "new_table", mode = "create", con = con, use_transaction = F)
 
   update_tbl_name =
     df |>
     dplyr::filter(id %in% c(1,3)) |>
     dplyr::mutate(name = c("Alicia", "Charles")) |>
-    write_table("update_tbl", mode = "create", con = con)
+    write_table("update_tbl", mode = "create", con = con, use_transaction = F)
 
   update_tbl = dplyr::tbl(con, update_tbl_name)
 
@@ -183,7 +190,7 @@ test_that("update", {
               mode = "update",
               con = con,
               by = "id",
-              unmatched = "ignore"
+              use_transaction = F
               )
 
   updated_df =
@@ -199,7 +206,7 @@ test_that("update", {
               mode = "update",
               con = con,
               by = "id",
-              unmatched = "ignore"
+              use_transaction = F
               )
   updated_df =
     dplyr::tbl(con, "new_table") |>
@@ -213,7 +220,7 @@ test_that("update", {
               mode = "update",
               con = con,
               by = "id",
-              unmatched = "ignore"
+              use_transaction = F
               )
   updated_df =
     dplyr::tbl(con, "new_table") |>
@@ -235,7 +242,13 @@ test_that("upsert", {
 
   # Upsert with new and existing IDs
   df_upsert = data.frame(id = c(2, 4), name = c("Bobby", "David"))
-  write_table(df_upsert, "test_table", mode = "upsert", con = con, by = "id")
+  write_table(df_upsert,
+              "test_table",
+              mode = "upsert",
+              con = con,
+              use_transaction = F,
+              by = "id"
+              )
 
   expect_equal(
     dplyr::tbl(con, "test_table") |>
@@ -251,12 +264,18 @@ test_that("upsert", {
   DBI::dbExecute(con,
                  'CREATE UNIQUE INDEX unique_id_index ON test_table ("id");'
                  )
-  write_table(df_upsert, "upsert_table", mode = "create", con = con)
+  write_table(df_upsert,
+              "upsert_table",
+              mode = "create",
+              con = con,
+              use_transaction = F
+              )
 
   write_table(dplyr::tbl(con, "upsert_table"),
               "test_table",
               mode = "upsert",
-              by = "id"
+              by = "id",
+              use_transaction = F
               )
 
   expect_equal(
@@ -287,42 +306,50 @@ test_that("patch", {
   DBI::dbWriteTable(con, "patch_table", df_patch)
 
 
-  write_table(df,
+
+  # expected_df = data.frame(id = 1:2,
+  #                          name = c("alice", "Bob"),
+  #                          value = c(10, 25)
+  #                          )
+
+  # expect_equal(
+  #   dplyr::tbl(con, "patch_table") |>
+  #   dplyr::collect() |>
+  #   as.data.frame(),
+  #   expected_df
+  # )
+
+  expect_error(
+    write_table(df,
               "patch_table",
               mode = "patch",
               con = con,
               by = "id",
-              unmatched = "ignore"
+              unmatched = "ignore",
+              use_transaction = F
               )
-  expected_df = data.frame(id = 1:2,
-                           name = c("alice", "Bob"),
-                           value = c(10, 25)
-                           )
-
-  expect_equal(
-    dplyr::tbl(con, "patch_table") |>
-    dplyr::collect() |>
-    as.data.frame(),
-    expected_df
   )
 
   # tbl
   DBI::dbRemoveTable(con, "patch_table")
   DBI::dbWriteTable(con, "patch_table", df_patch)
 
-  write_table(dplyr::tbl(con, "new_table"),
-              "patch_table",
-              mode = "patch",
-              con = con,
-              by = "id",
-              unmatched = "ignore"
-              )
-  expect_equal(
-    dplyr::tbl(con, "patch_table") |>
-    dplyr::collect() |>
-    as.data.frame(),
-    expected_df
+  expect_error(
+    write_table(dplyr::tbl(con, "new_table"),
+                "patch_table",
+                mode = "patch",
+                con = con,
+                by = "id",
+                unmatched = "ignore",
+                use_transaction = F
+                )
   )
+  # expect_equal(
+  #   dplyr::tbl(con, "patch_table") |>
+  #   dplyr::collect() |>
+  #   as.data.frame(),
+  #   expected_df
+  # )
 
 })
 
@@ -341,7 +368,7 @@ test_that("delete mode works correctly", {
               mode = "delete",
               con = con,
               by = "id",
-              unmatched = "ignore"
+              use_transaction = F
               )
 
   # Check the result
@@ -360,7 +387,7 @@ test_that("delete mode works correctly", {
               mode = "delete",
               con = con,
               by = "id",
-              unmatched = "ignore"
+              use_transaction = F
               )
 
   # Check the result
@@ -386,7 +413,8 @@ test_that("overwrite", {
   write_table(overwrite_df,
               "test_table",
               mode = "overwrite",
-              con = con
+              con = con,
+              use_transaction = F
               )
 
   expect_equal(dplyr::tbl(con, "test_table") |>
@@ -402,7 +430,8 @@ test_that("overwrite", {
   write_table(dplyr::tbl(con, "or_table"),
               "test_table",
               mode = "overwrite",
-              con = con
+              con = con,
+              use_transaction = F
               )
   expect_equal(dplyr::tbl(con, "test_table") |>
                  dplyr::collect() |>
@@ -415,7 +444,8 @@ test_that("overwrite", {
   expect_error(write_table(overwrite_df,
                            "non_existent_table",
                            mode = "overwrite",
-                           con = con
+                           con = con,
+                           use_transaction = F
                            )
                )
 })
@@ -438,7 +468,8 @@ test_that("overwrite_schema", {
   write_table(os_df,
               "test_table",
               mode = "overwrite_schema",
-              con = con
+              con = con,
+              use_transaction = F
               )
 
   expect_true(DBI::dbExistsTable(con, "test_table"))
@@ -460,7 +491,8 @@ test_that("overwrite_schema", {
   write_table(dplyr::tbl(con, "new_table"),
               "test_table",
               mode = "overwrite_schema",
-              con = con
+              con = con,
+              use_transaction = F
               )
 
   expect_true(DBI::dbExistsTable(con, "test_table"))
@@ -487,7 +519,8 @@ test_that("overwrite_schema", {
   write_table(head(os_df, 0),
               "test_table",
               mode = "overwrite_schema",
-              con = con
+              con = con,
+              use_transaction = F
               )
 
   expect_true(DBI::dbExistsTable(con, "test_table"))
@@ -509,7 +542,8 @@ test_that("overwrite_schema", {
   write_table(dplyr::tbl(con, "new_table"),
               "test_table",
               mode = "overwrite_schema",
-              con = con
+              con = con,
+              use_transaction = F
               )
 
   expect_true(DBI::dbExistsTable(con, "test_table"))

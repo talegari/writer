@@ -4,7 +4,7 @@
 \alias{write_tbl_overwrite}
 \title{write_tbl_overwrite}
 \usage{
-write_tbl_overwrite(source_tbl, dest_table_name, con, ...)
+write_tbl_overwrite(source_tbl, dest_table_name, con, transaction_flag, ...)
 }
 \description{
 write_tbl_overwrite
