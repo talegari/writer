@@ -541,29 +541,19 @@ write_table.data.frame = function(x,
     paste0(sample(letters, len), collapse = "")
   }
 
-  table_name_split = strsplit(table_name, "\\.")[[1]]
-  temp_table_split = table_name_split
-
-  while (TRUE){
-    temp_table_split[length(temp_table_split)] = create_random_name()
-
-    table_exists_flag =
-      DBI::dbExistsTable(con,
-                         string_to_id(paste0(temp_table_split, collapse = "."))
-                         )
-    if (!table_exists_flag){
-      break
-    }
-  }
-
-  temp_table_name = paste0(temp_table_split, collapse = ".")
-
   if (("use_inline" %in% names(arguments)) && arguments$use_inline){
-    df_tbl = dbplyr::copy_inline(con = con, df = x)
+    # render circus here is to avoid a transaction
+    df_tbl = dplyr::tbl(con,
+                        dbplyr::sql_render(dbplyr::copy_inline(con = con,
+                                                               df = x
+                                                               )
+                                           )
+                        )
   } else {
     df_tbl = dplyr::copy_to(dest = con,
                             df = x,
-                            name = wrap_by_I(temp_table_name),
+                            name = create_random_name(),
+                            overwrite = TRUE,
                             temporary = TRUE
                             )
   }

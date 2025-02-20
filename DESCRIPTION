@@ -1,7 +1,7 @@
 Type: Package
 Package: writer
 Title: Write from Multiple Sources to a Database Table
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: 
     person(
     "Komala Sheshachala", "Srikanth",
